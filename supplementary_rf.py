@@ -18,18 +18,19 @@ FEATURE_NAMES = [
     "Motor speech", "Phonology", "Semantic knowledge", "Syntax", "Working memory",
 ]
 LABELS = ["naPPA", "svPPA", "lvPPA"]  # naPPA corresponds to nfvPPA in the paper.
-TREE_GRID = [50, 75, 100, 150, 200, 300, 450, 600, 900, 1200]
+TREE_GRID = [100, 200, 300, 500]
 
 
 def run_rf_analysis(
-    df, *, outer_splits=5, repeats=10, inner_splits=4,
+    df, *, outer_splits=5, repeats=10, inner_splits=5,
     tree_grid=None, n_jobs=-1, make_plots=True,
 ):
     """Run nested CV and return numeric results and the illustrative tree.
 
-    All folds use the original seeds: outer=1, inner=42, forest=3.
-    SD is calculated across outer folds with ddof=0, as in the notebook.
-    Voting ties retain the first encountered prediction, as in the notebook.
+    Tree count is selected independently in each outer fold.
+    Random seeds: outer=1, inner=42, forest=3.
+    SD is calculated across outer folds with ddof=0.
+    Voting ties retain the first encountered prediction.
     The illustrative tree is selected using outer-test accuracy; its selected
     accuracy is descriptive and is not an unbiased estimate of tree performance.
     """
@@ -49,6 +50,8 @@ def run_rf_analysis(
     if counts.min() < outer_splits:
         raise ValueError("Each PPA subtype needs at least outer_splits participants.")
     print("PPA sample size:", len(data), "| Class counts:", counts.to_dict())
+    print(f"Nested CV: outer={outer_splits} folds x {repeats} repeats; "
+          f"inner={inner_splits} folds; n_estimators={grid}; max_depth=4")
 
     def forest(n):
         return RandomForestClassifier(
@@ -110,7 +113,7 @@ def run_rf_analysis(
             ids = tree.predict(X_test.to_numpy()).astype(int)
             tree_pred = model.classes_[ids]
             score = accuracy_score(y_test, tree_pred)
-            if score > best_tree_score:  # First tree wins exact ties, as with argmax.
+            if score > best_tree_score:  # First tree wins exact ties.
                 best_tree, best_tree_score = tree, score
                 best_tree_classes = model.classes_.copy()
 
